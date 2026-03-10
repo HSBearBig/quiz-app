@@ -34,17 +34,12 @@ def load_and_parse_pdf(file_path):
 
 st.title("📝 專屬題庫測驗系統")
 
-# --- 💡 這裡加入了智慧排序功能 ---
 def get_sort_key(filename):
-    # 尋找檔名中的數字，例如「第1科_XXX.pdf」會抓出 '1'
     numbers = re.findall(r'\d+', filename)
-    # 轉換成整數來正確排序(1, 2, 3...10)；如果檔名剛好沒數字，就排到最下面
     return int(numbers[0]) if numbers else float('inf')
 
-# 抓取所有 PDF 並進行排序
 raw_pdf_files = [f for f in os.listdir() if f.endswith('.pdf')]
 pdf_files = sorted(raw_pdf_files, key=get_sort_key)
-# ---------------------------------
 
 if not pdf_files:
     st.warning("⚠️ 找不到任何 PDF 檔案，請確認有將題庫上傳至 GitHub。")
@@ -55,12 +50,15 @@ selected_file = st.selectbox("請選擇要練習的題庫：", pdf_files)
 if 'mistakes' not in st.session_state:
     st.session_state.mistakes = {}
 
+# 切換題庫時，把所有頁籤的暫存紀錄清空
 if "current_bank" not in st.session_state or st.session_state.current_bank != selected_file:
     st.session_state.current_bank = selected_file
-    for key in ['test_set', 'submitted', 'user_answers', 'quick_q', 'quick_ans']:
-        if key in st.session_state:
+    # 清理舊的狀態
+    for key in list(st.session_state.keys()):
+        if key in ['test_set', 'submitted', 'user_answers', 'quick_q'] or key.startswith('quick_ans'):
             del st.session_state[key]
     st.session_state.mistakes = {} 
+    st.session_state.quick_key = 0 # 重置動態 ID
 
 with st.spinner(f'載入 {selected_file} 中，請稍候...'):
     qs = load_and_parse_pdf(selected_file)
@@ -153,16 +151,22 @@ with tab3:
 
     if 'quick_q' not in st.session_state:
         st.session_state.quick_q = random.choice(qs)
+    # 加入動態 ID 計數器
+    if 'quick_key' not in st.session_state:
+        st.session_state.quick_key = 0
 
     q = st.session_state.quick_q
 
     st.markdown(f"**【題號 {q['id']}】**")
     st.write(q['text'])
 
+    # 💡 關鍵修復：每次換題，都給選項按鈕一個全新的專屬 ID
+    current_radio_key = f"quick_ans_{st.session_state.quick_key}"
+    
     quick_ans = st.radio(
         "請選擇答案：",
         options=["1", "2", "3", "4"],
-        key="quick_ans",
+        key=current_radio_key,
         horizontal=True,
         index=None
     )
@@ -174,9 +178,10 @@ with tab3:
             st.error(f"❌ 答錯了！正確答案是：({q['ans']})")
             st.session_state.mistakes[q['id']] = q
 
-        if st.button("➡️ 下一題", key="next_quick_q"):
+        # 下一題的按鈕也綁定動態 ID
+        if st.button("➡️ 下一題", key=f"next_quick_{st.session_state.quick_key}"):
             st.session_state.quick_q = random.choice(qs)
-            del st.session_state.quick_ans
+            st.session_state.quick_key += 1  # 點擊後 ID 加 1，強制產生新按鈕
             st.rerun()
 
 with tab4:
@@ -196,6 +201,7 @@ with tab4:
         if st.button("🗑️ 清空錯題本"):
             st.session_state.mistakes = {}
             st.rerun()
+
 
 
 
