@@ -34,23 +34,20 @@ def load_and_parse_pdf(file_path):
 
 st.title("📝 專屬題庫測驗系統")
 
-# 💡 自動抓取資料夾內所有的 PDF 檔
 pdf_files = [f for f in os.listdir() if f.endswith('.pdf')]
 if not pdf_files:
     st.warning("⚠️ 找不到任何 PDF 檔案，請確認有將題庫上傳至 GitHub。")
     st.stop()
 
-# 下拉式選單現在會自動帶入所有 PDF 檔名
 selected_file = st.selectbox("請選擇要練習的題庫：", pdf_files)
 
-# 切換題庫時，清除上一份考卷的紀錄
+# 切換題庫時，把所有頁籤的暫存紀錄都清空
 if "current_bank" not in st.session_state or st.session_state.current_bank != selected_file:
     st.session_state.current_bank = selected_file
-    for key in ['test_set', 'submitted', 'user_answers']:
+    for key in ['test_set', 'submitted', 'user_answers', 'quick_q', 'quick_ans']:
         if key in st.session_state:
             del st.session_state[key]
 
-# 讀取題庫
 with st.spinner(f'載入 {selected_file} 中，請稍候...'):
     qs = load_and_parse_pdf(selected_file)
 
@@ -60,29 +57,26 @@ if not qs:
 
 st.success(f"🎉 成功載入！共偵測到 {len(qs)} 個題目。")
 
-tab1, tab2 = st.tabs(["🎲 隨機測驗", "🔍 查看特定題號"])
+# --- 新增第三個頁籤：馬上讀 ---
+tab1, tab2, tab3 = st.tabs(["🎲 隨機測驗", "🔍 查看特定題號", "⚡ 馬上讀"])
 
 with tab1:
-    # 初始化「是否已交卷」的狀態
     if 'submitted' not in st.session_state:
         st.session_state.submitted = False
 
-    # 狀態 1：尚未產生測驗卷
     if 'test_set' not in st.session_state:
         num_q = st.number_input("想練習幾題？", min_value=1, max_value=len(qs), value=min(10, len(qs)))
         if st.button("產生測驗卷"):
             st.session_state.test_set = random.sample(qs, num_q)
             st.session_state.submitted = False
-            st.rerun() # 重新整理網頁進入測驗模式
+            st.rerun() 
 
-    # 狀態 2：正在測驗中 (還沒交卷)
     elif not st.session_state.submitted:
         with st.form("quiz_form"):
             user_answers = {}
             for i, q in enumerate(st.session_state.test_set, 1):
                 st.markdown(f"**【第 {i} 題 / 題號 {q['id']}】**")
                 st.write(q['text'])
-                # index=None 讓選項預設為空白，避免不小心猜中
                 user_answers[q['id']] = st.radio(
                     "請選擇答案：", 
                     options=["1", "2", "3", "4"], 
@@ -94,15 +88,13 @@ with tab1:
                 
             submit_button = st.form_submit_button("交卷看成績")
             if submit_button:
-                # 檢查是不是每一題都寫了
                 if None in user_answers.values():
                     st.warning("⚠️ 還有題目未作答喔！請確認每一題都已勾選。")
                 else:
                     st.session_state.user_answers = user_answers
                     st.session_state.submitted = True
-                    st.rerun() # 重新整理網頁進入檢討模式
+                    st.rerun() 
 
-    # 狀態 3：已經交卷 (檢討模式 - 直接顯示對錯)
     else:
         st.subheader("📊 測驗結果")
         score = 0
@@ -115,7 +107,6 @@ with tab1:
             user_ans = st.session_state.user_answers[q['id']]
             correct_ans = q['ans']
             
-            # 💡 這裡就是你想要的 UI 優化：把對錯結果直接畫在題目下方！
             if user_ans == correct_ans:
                 score += 1
                 st.success(f"✅ 你的答案：({user_ans}) —— 答對了！")
@@ -125,7 +116,6 @@ with tab1:
             
         st.info(f"💯 最終得分：{score} / {total}")
         
-        # 點擊後清除記憶，重新開始
         if st.button("🔄 再測驗一次"):
             del st.session_state.test_set
             del st.session_state.submitted
@@ -143,3 +133,42 @@ with tab2:
                 st.warning("找不到該題號。")
         else:
             st.warning("請先輸入題號！")
+
+# --- ⚡ 馬上讀 的運作邏輯 ---
+with tab3:
+    st.subheader("⚡ 馬上讀 (一題一答)")
+
+    # 1. 確保記憶中有一題隨機題目
+    if 'quick_q' not in st.session_state:
+        st.session_state.quick_q = random.choice(qs)
+
+    q = st.session_state.quick_q
+
+    # 2. 顯示題目
+    st.markdown(f"**【題號 {q['id']}】**")
+    st.write(q['text'])
+
+    # 3. 讓使用者點選答案 (綁定 key 為 quick_ans)
+    quick_ans = st.radio(
+        "請選擇答案：",
+        options=["1", "2", "3", "4"],
+        key="quick_ans",
+        horizontal=True,
+        index=None
+    )
+
+    # 4. 如果已經點選了答案，立刻進行判定
+    if quick_ans is not None:
+        if quick_ans == q['ans']:
+            st.success("✅ 答對了！")
+        else:
+            st.error(f"❌ 答錯了！正確答案是：({q['ans']})")
+
+        # 提供下一題的按鈕
+        if st.button("➡️ 下一題", key="next_quick_q"):
+            # 重新抽一題新的存起來
+            st.session_state.quick_q = random.choice(qs)
+            # 清除剛剛的選項紀錄，讓選單恢復空白
+            del st.session_state.quick_ans
+            st.rerun()
+
