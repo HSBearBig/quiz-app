@@ -39,8 +39,8 @@ st.title("📝 專屬題庫測驗系統")
 # 1. 這裡定義你的題庫選單！
 # 左邊是「網頁上顯示的名稱」，右邊是「實際的 PDF 檔名」
 question_banks = {
-    "題庫一：甲級廢水處理": "bank1.pdf",
-    "題庫二：乙級廢水處理 (請自行修改)": "bank2.pdf"
+    "題庫一：防治法規": "bank1.pdf",
+    "題庫二：申報許可": "bank2.pdf"
 }
 
 # 2. 建立下拉式選單
@@ -108,4 +108,5 @@ if os.path.exists(selected_file_path):
                     st.warning("請先輸入題號！")
 else:
     # 如果找不到檔案，提醒使用者上傳
+
     st.warning(f"⚠️ 找不到檔案 `{selected_file_path}`。請確認你已經將這個 PDF 檔上傳到 GitHub！")
