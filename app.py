@@ -19,38 +19,24 @@ def load_and_parse_pdf(file_path):
     except Exception as e:
         return []
 
-    # --- 🐛 抓蟲升級 1：防禦小數點偽裝 ---
-    # 在 \. 後面加上 (?!\d)，確保小數點後面不能接數字，才不會把 (1) 0.02 當成題號
-    pattern = r'\((\d)\)\s*(\d+)\.(?!\d)(.*?)(?=\(\d\)\s*\d+\.(?!\d)|$)'
+    # --- 🐛 抓蟲升級 3：無敵寬容模式，允許括號內有空格 ---
+    # 清除異常換行時，允許括號內外有奇怪的空格，例如：( 2 ) 46.
+    clean_text = re.sub(r'\n(?!\(\s*\d\s*\)\s*\d+\.)', '', all_text)
     
-    clean_text = re.sub(r'\n(?!\(\d\)\d+\.)', '', all_text)
+    # 匹配題目時，同樣允許括號內有空格
+    pattern = r'\(\s*(\d)\s*\)\s*(\d+)\.(?!\d)(.*?)(?=\(\s*\d\s*\)\s*\d+\.(?!\d)|$)'
+    
     matches = re.findall(pattern, clean_text, re.DOTALL)
     
-    # --- 🐛 抓蟲升級 2：過濾 PDF 殘影 ---
-    # 使用字典 (dict) 來存題號，這樣如果不小心抓到重複的殘影，就會被後面完整的題目自動覆蓋
     questions_dict = {}
     for ans, num, content in matches:
         questions_dict[num.strip()] = {
             "id": num.strip(),
-            "ans": ans.strip(),
+            "ans": ans.strip(), # strip() 會自動幫我們把抓到的空白清掉
             "text": content.strip()
         }
         
-    # 把過濾完的字典轉回原本系統需要的清單格式
     return list(questions_dict.values())
-
-    pattern = r'\((\d)\)\s*(\d+)\.(.*?)(?=\(\d\)\s*\d+\.|$)'
-    clean_text = re.sub(r'\n(?!\(\d\)\d+\.)', '', all_text)
-    matches = re.findall(pattern, clean_text, re.DOTALL)
-    
-    questions = []
-    for ans, num, content in matches:
-        questions.append({
-            "id": num.strip(),
-            "ans": ans.strip(),
-            "text": content.strip()
-        })
-    return questions
 
 st.title("📝 專屬題庫測驗系統")
 
@@ -266,6 +252,7 @@ with tab5:
                 if 'current_mistake_q' in st.session_state:
                     del st.session_state.current_mistake_q
                 st.rerun()
+
 
 
 
