@@ -19,25 +19,42 @@ def load_and_parse_pdf(file_path):
     except Exception as e:
         return []
 
-    # --- 🐛 抓蟲升級 3：無敵寬容模式，允許括號內有空格 ---
-    # 清除異常換行時，允許括號內外有奇怪的空格，例如：( 2 ) 46.
     clean_text = re.sub(r'\n(?!\(\s*\d\s*\)\s*\d+\.)', '', all_text)
-    
-    # 匹配題目時，同樣允許括號內有空格
     pattern = r'\(\s*(\d)\s*\)\s*(\d+)\.(?!\d)(.*?)(?=\(\s*\d\s*\)\s*\d+\.(?!\d)|$)'
-    
     matches = re.findall(pattern, clean_text, re.DOTALL)
     
     questions_dict = {}
     for ans, num, content in matches:
         questions_dict[num.strip()] = {
             "id": num.strip(),
-            "ans": ans.strip(), # strip() 會自動幫我們把抓到的空白清掉
+            "ans": ans.strip(),
             "text": content.strip()
         }
         
+    # --- 🛠️ 抓蟲升級 5：針對個別 PDF 檔的分類勘誤表 ---
+    # 第一層寫「PDF 檔名」，第二層寫「題號: 正確答案」
+    corrections = {
+        "污泥減量 (2).pdf": {
+            "45": "3",  # 👈 污泥減量這份 PDF 的第 45 題，答案改成 3
+            "12": "2"   
+        },
+        "甲級廢水_1.pdf": {
+            "50": "4"   # 👈 甲級廢水這份 PDF 的第 50 題，答案改成 4
+        }
+        # 如果有第三科、第四科，就繼續往下加...
+    }
+    
+    # 程式會自動去查目前讀取的是哪個檔案 (file_path 就是檔名)
+    # 抓出專屬於這份 PDF 的勘誤表，如果沒有設定，就給一個空字典 {}
+    file_corrections = corrections.get(file_path, {})
+    
+    # 開始替換專屬的錯誤答案
+    for q_id, correct_ans in file_corrections.items():
+        if q_id in questions_dict:
+            questions_dict[q_id]["ans"] = correct_ans
+            questions_dict[q_id]["text"] += "\n\n*(💡 此題解答已由系統手動勘誤修正)*"
+            
     return list(questions_dict.values())
-
 st.title("📝 專屬題庫測驗系統")
 
 def get_sort_key(filename):
